@@ -158,7 +158,7 @@ def update_openai_api_key(openai_api_key):
         State("upload-data-modal", "is_open"),
     ],
 )
-def upload_data_modal(button_upload, button_close, is_open):
+def update_upload_data_modal(button_upload, button_close, is_open):
     if button_upload or button_close:
         return not is_open
     return is_open

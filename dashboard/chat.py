@@ -4,6 +4,7 @@ from dashboard.components import main_wrapper
 from dashboard.app import app
 from ada.main import data_analyst_action
 from ada.agents.data import Files
+from . import db
 import pandas as pd
 import ast
 import pickle
@@ -19,10 +20,18 @@ def layout(sidebar_context, debug=False):
             "flex-direction": "column-reverse",
         },
     )
+    recent_questions = db.crud_question.list_previous_questions()
     controls = dbc.InputGroup(
         [
+            html.Datalist(
+                id="list-suggested-inputs",
+                children=[html.Option(value=question) for question in recent_questions],
+            ),
             dbc.Input(
-                id="user-input", placeholder="Write to the chatbot...", type="text"
+                id="user-input",
+                placeholder="Write to the chatbot...",
+                type="text",
+                list="list-suggested-inputs",
             ),
             dbc.Button("Submit", id="submit", style={"background-color": "#218aff"}),
         ]
@@ -126,15 +135,21 @@ def run_chatbot(n_clicks, n_submit, user_input, chat_history, openai_api_key, fi
     if user_input is None or user_input == "":
         return chat_history, None
 
-    data_agent = Files.load(file_dir)
+    if file_dir:
+        data_agent = Files.load(file_dir)
+    else:
+        data_agent = Files.load("/root/ada/data/example_data")
 
-    # First add the user input to the chat history
-    chat_history.append(user_input)
     # Get Ada's response
     ada_action = data_analyst_action(
         user_input, data_agent=data_agent, openai_api_key=openai_api_key
     )
+    # Add the input and the response to the chat history
+    chat_history.append(user_input)
     chat_history.append(ada_action)
+
+    # Save the user input to the database
+    db.crud_question.create(db.Question(text=user_input))
 
     return chat_history, None
 

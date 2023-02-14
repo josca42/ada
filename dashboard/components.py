@@ -144,7 +144,6 @@ def update_openai_api_key(openai_api_key):
     if openai_api_key:
         openai_key_hide = "................"
     else:
-        openai_api_key = "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"
         openai_key_hide = ""
     return openai_key_hide, openai_api_key
 

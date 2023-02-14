@@ -11,12 +11,12 @@ app.layout = html.Div(
         html.Div(id="content"),
         dcc.Store(
             "openai-api-key",
-            data="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",
+            data="",
             storage_type="session",
         ),
         dcc.Store(
             "file-dir",
-            data="/Users/josca/projects/ada/data/uploaded_data/d3a3ddc1-0376-4c67-b6e3-a73eae937352",
+            data="",
             storage_type="session",
         ),
     ]

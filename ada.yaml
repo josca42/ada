@@ -1,0 +1,23 @@
+name: ada
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.5
+  - pandas
+  - numpy
+  - openai
+  - ca-certificates
+  - openssl
+  - certifi
+  - jupyterlab
+  - pyarrow
+  - black
+  - dash
+  - dash-bootstrap-components
+  - python-duckdb
+  - loguru
+  - python-dotenv
+  - tabulate
+  - sqlmodel=0.0.8
+  - dash-mantine-components
+prefix: /Users/josca/mambaforge/envs/ada

@@ -1,0 +1,21 @@
+.tab-card {
+  line-height: 1.2;
+  padding: 16px 25px !important;
+  background-color: #f8f9fc !important;
+  border: none !important;
+  border-bottom: 1px solid #e3e6f0 !important;
+  overflow: hidden !important;
+  span {
+    @extend .m-0;
+    @extend .fw-bold;
+    @extend .text-primary;
+  }
+  &:not(:last-child) {
+    border-right: 1px solid #e3e6f0 !important;
+  }
+}
+
+.tab-card-enabled {
+  padding: 11px 25px 16px 25px !important;
+  border-top: 5px solid $primary !important;
+}

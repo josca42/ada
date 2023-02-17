@@ -1,4 +1,4 @@
-from .utils import complete_prompt, log_input_output
+from ..utils import log_input_output
 
 plotter_prompt_template = """I want you to act as a data scientist and code for me. Given an input question and an input summary please write code for visualizing the data in the dataframe df.
 
@@ -19,14 +19,9 @@ Code:"""
 
 
 @log_input_output(log_input=False, log_output=True)
-def get_plot_code(input_context: str, question: str, openai_api_key: str) -> str:
+def ploty_plots(input_context: str, question: str, llm) -> str:
     prompt = plotter_prompt_template.format(
         input_summary=input_context, question=question
     )
-    plot_code = complete_prompt(
-        prompt=prompt,
-        stop="\nfig.show()",
-        max_tokens=2_000,
-        openai_api_key=openai_api_key,
-    )
-    return plot_code.completion
+    plot_code = llm(prompt=prompt, stop="\nfig.show()")
+    return plot_code

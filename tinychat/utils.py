@@ -14,13 +14,13 @@ logger.level("data", no=33, color="<blue>")
 logger.level("info", no=33, color="<black>")
 
 
-def complete_prompt(
+def openai_completion(
     prompt,
     stop=None,
     model="text-davinci-003",
     temperature=0,
     max_tokens=2_000,
-    openai_api_key=None,
+    api_key=None,
 ):
     completion = db.Completion(
         prompt=prompt,
@@ -28,24 +28,24 @@ def complete_prompt(
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
+        api_key=api_key,
     )
     completion_stored = db.crud_completion.get(completion.hash_id)
     if completion_stored:
-        return completion_stored
+        return completion_stored.completion
     else:
-        time.sleep(1)
-        openai.api_key = openai_api_key
         response = openai.Completion.create(
             prompt=prompt,
             model=model,
             temperature=temperature,
             stop=stop,
             max_tokens=max_tokens,
+            api_key=api_key,
         )
         text = response["choices"][0].text
         completion.completion = text
         db.crud_completion.create(completion)
-        return completion
+        return completion.completion
 
 
 def log_input_output(log_input: bool = True, log_output: bool = True):

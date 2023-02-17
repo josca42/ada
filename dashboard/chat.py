@@ -1,16 +1,51 @@
 from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
 from dashboard.components import main_wrapper
-from dashboard.app import app
-from ada.main import data_analyst_action
-from ada.agents.data import Files
-from . import db
+from dashboard.app import app, server
+from functools import partial
 import pandas as pd
 import ast
-import pickle
+from ada.utils import openai_completion
+from ada.agents import data_analyst
+from dash import dcc, html, Input, Output
+from dotenv import dotenv_values
+from . import db
+
+data_dir = dotenv_values()["DATA_DIR"]
+sidebar_context = {
+    "/": {
+        "title": "IMDB movies",
+        "href": "/",
+        "icon": "fa-regular fa-message",
+        "data_dir": f"{data_dir}/imdb",
+    },
+}
+
+app.layout = html.Div(
+    [
+        dcc.Location(id="urlNoRefresh"),
+        dcc.Location(id="urlRefresh", refresh=True),
+        html.Div(id="content"),
+        dcc.Store(
+            "openai-api-key",
+            data="",
+            storage_type="session",
+        ),
+        dcc.Store(
+            "app-state",
+            data=sidebar_context,
+            storage_type="session",
+        ),
+    ]
+)
 
 
-def layout(sidebar_context, debug=False):
+@app.callback(
+    Output("content", "children"),
+    Input("app-state", "data"),
+)
+def layout(sidebar_context):
+    sidebar_context = [sidebar_item for path, sidebar_item in sidebar_context.items()]
     conversation = html.Div(
         html.Div(id="display-conversation"),
         style={
@@ -51,6 +86,51 @@ def layout(sidebar_context, debug=False):
     )
 
 
+@app.callback(
+    Output("display-conversation", "children"), [Input("store-conversation", "data")]
+)
+def update_conversation(chat_history):
+    return [
+        textbox(x, box="user") if i % 2 == 0 else textbox(x, box="AI")
+        for i, x in enumerate(chat_history)
+    ]
+
+
+@app.callback(
+    [Output("store-conversation", "data"), Output("loading-component", "children")],
+    [Input("submit", "n_clicks"), Input("user-input", "n_submit")],
+    [
+        State("user-input", "value"),
+        State("store-conversation", "data"),
+        State("openai-api-key", "data"),
+        State("app-state", "data"),
+        Input("urlNoRefresh", "pathname"),
+    ],
+)
+def answer_question(
+    n_clicks, n_submit, user_input, chat_history, openai_api_key, app_state, pathname
+):
+    if n_clicks == 0 and n_submit is None:
+        return "", None
+
+    if user_input is None or user_input == "":
+        return chat_history, None
+
+    # Get data analyst response
+    data_dir = app_state[pathname]["data_dir"]
+    response = data_analyst(
+        user_input, openai_api_key=openai_api_key, data_dir=data_dir
+    )
+    # Add the input and the response to the chat history
+    chat_history.append(user_input)
+    chat_history.append(response)
+
+    # Save the user input to the database
+    db.crud_question.create(db.Question(text=user_input))
+
+    return chat_history, None
+
+
 def textbox(input, box="AI"):
     style = {
         "max-width": "100%",
@@ -74,7 +154,7 @@ def textbox(input, box="AI"):
         )
 
     elif box == "AI":
-        action, data = input["action"], input["data"]
+        action, action_data = input["action"], input["action_data"]
         if action["tool"] == "Text":
             input = action["input"]
             style["margin-left"] = 0
@@ -83,8 +163,8 @@ def textbox(input, box="AI"):
             style["color"] = "black"
             return dbc.Card(input, style=style, body=True, inverse=False)
         elif action["tool"] == "Plot":
-            df = pd.read_json(data["data"])
-            code = data["code"]
+            df = pd.read_json(action_data["data"])
+            code = action_data["code"]
 
             # Use ast to execute the code and extract the variable `fig`
             node = ast.parse(code)
@@ -100,59 +180,11 @@ def textbox(input, box="AI"):
         raise ValueError("Incorrect option for `box`.")
 
 
-@app.callback(
-    Output("display-conversation", "children"), [Input("store-conversation", "data")]
-)
-def update_display(chat_history):
-    return [
-        textbox(x, box="user") if i % 2 == 0 else textbox(x, box="AI")
-        for i, x in enumerate(chat_history)
-    ]
-
-
-@app.callback(
-    Output("user-input", "value"),
-    [Input("submit", "n_clicks"), Input("user-input", "n_submit")],
-)
-def clear_input(n_clicks, n_submit):
-    return ""
-
-
-@app.callback(
-    [Output("store-conversation", "data"), Output("loading-component", "children")],
-    [Input("submit", "n_clicks"), Input("user-input", "n_submit")],
-    [
-        State("user-input", "value"),
-        State("store-conversation", "data"),
-        State("openai-api-key", "data"),
-        State("file-dir", "data"),
-    ],
-)
-def run_chatbot(n_clicks, n_submit, user_input, chat_history, openai_api_key, file_dir):
-    if n_clicks == 0 and n_submit is None:
-        return "", None
-
-    if user_input is None or user_input == "":
-        return chat_history, None
-
-    if file_dir:
-        data_agent = Files.load(file_dir)
-    else:
-        data_agent = Files.load("/root/ada/data/example_data")
-
-    # Get Ada's response
-    ada_action = data_analyst_action(
-        user_input, data_agent=data_agent, openai_api_key=openai_api_key
-    )
-    # Add the input and the response to the chat history
-    chat_history.append(user_input)
-    chat_history.append(ada_action)
-
-    # Save the user input to the database
-    db.crud_question.create(db.Question(text=user_input))
-
-    return chat_history, None
-
-
 if __name__ == "__main__":
-    app.run_server(debug=False)
+    # from ada.tools import data
+
+    # upload_dir = "/Users/josca/projects/ada/data/imdb"
+    # data_agent = data.Files(data_dir=upload_dir, llm=None)
+    # data_agent.save(upload_dir)
+
+    app.run_server(port=8050, debug=True)

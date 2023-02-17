@@ -3,12 +3,10 @@ from dash import html, dcc, Input, Output, State
 import base64
 from dashboard.app import app
 import dash_bootstrap_components as dbc
-import tempfile
-import os
 from ada.config import config
-from ada.agents.data import Files
+from ada.tools import data
 import uuid
-import pickle
+from pathlib import Path
 
 
 def main_wrapper(element, sidebar_context):
@@ -145,6 +143,7 @@ def update_openai_api_key(openai_api_key):
         openai_key_hide = "................"
     else:
         openai_key_hide = ""
+        openai_api_key = "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"
     return openai_key_hide, openai_api_key
 
 
@@ -165,29 +164,42 @@ def update_upload_data_modal(button_upload, button_close, is_open):
 
 
 @app.callback(
-    [Output("data-uploaded", "children"), Output("file-dir", "data")],
+    [Output("data-uploaded", "children"), Output("app-state", "data")],
     Input("upload-data-file", "contents"),
-    State("upload-data-file", "filename"),
+    [State("upload-data-file", "filename"), State("app-state", "data")],
     prevent_initial_call=True,
 )
-def save_uploaded_file_to_disk(content, filename):
+def save_uploaded_file_to_disk(content, filename, app_state):
     if content is None:
-        return html.H5("No file uploaded", style={"textAlign": "center"}), None
+        return html.H5("No file uploaded", style={"textAlign": "center"}), app_state
 
     try:
+        # Dump data to disk
         upload_dir = config["DATA_DIR"] / "uploaded_data" / str(uuid.uuid4())
         upload_dir.mkdir()
-        data = content.encode("utf8").split(b";base64,")[1]
+        data_uploaded = content.encode("utf8").split(b";base64,")[1]
         with open(upload_dir / filename, "wb") as fp:
-            fp.write(base64.decodebytes(data))
+            fp.write(base64.decodebytes(data_uploaded))
 
-        data_agent = Files(files_dir_path=upload_dir)
-        data_agent.save(upload_dir)
+        # Create data agent and save
+        data_agent = data.Files(data_dir=upload_dir, llm=None)
+        data_agent.save(str(upload_dir))
+
+        # Update app state
+        name = filename.split(".")[0]
+        href = "/" + name
+        app_state[href] = {
+            "title": name,
+            "href": href,
+            "icon": "fa-regular fa-message",
+            "data_dir": str(upload_dir),
+        }
 
     except Exception as e:
         print(e)
-        return html.H5(f"There was an error processing {filename}")
+        return html.H5(f"There was an error processing {filename}"), app_state
 
-    return html.H5(f"{filename} has been uploaded", style={"textAlign": "center"}), str(
-        upload_dir
+    return (
+        html.H5(f"{filename} has been uploaded", style={"textAlign": "center"}),
+        app_state,
     )

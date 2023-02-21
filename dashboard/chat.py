@@ -2,14 +2,14 @@ from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
 from dashboard.components import main_wrapper
 from dashboard.app import app, server
-from functools import partial
 import pandas as pd
 import ast
-from ada.utils import openai_completion
-from ada.agents import data_analyst
+from ada import data_analyst
 from dash import dcc, html, Input, Output
 from dotenv import dotenv_values
-from . import db
+import dash
+from dashboard import db
+from ada import data
 
 data_dir = dotenv_values()["DATA_DIR"]
 sidebar_context = {
@@ -28,7 +28,7 @@ app.layout = html.Div(
         html.Div(id="content"),
         dcc.Store(
             "openai-api-key",
-            data="",
+            data="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",
             storage_type="session",
         ),
         dcc.Store(
@@ -73,7 +73,7 @@ def layout(sidebar_context):
     )
     chat_window = dbc.Container(
         [
-            dcc.Store(id="store-conversation", data=[]),
+            dcc.Store(id="store-conversation", data={"/": []}),
             conversation,
             controls,
             dbc.Spinner(html.Div(id="loading-component")),
@@ -87,11 +87,13 @@ def layout(sidebar_context):
 
 
 @app.callback(
-    Output("display-conversation", "children"), [Input("store-conversation", "data")]
+    Output("display-conversation", "children"),
+    [Input("store-conversation", "data"), Input("urlNoRefresh", "pathname")],
 )
-def update_conversation(chat_history):
+def update_conversation(chats, pathname):
+    chat_history = chats[pathname]
     return [
-        textbox(x, box="user") if i % 2 == 0 else textbox(x, box="AI")
+        textbox(x, box="AI") if i % 2 == 0 else textbox(x, box="user")
         for i, x in enumerate(chat_history)
     ]
 
@@ -108,27 +110,48 @@ def update_conversation(chat_history):
     ],
 )
 def answer_question(
-    n_clicks, n_submit, user_input, chat_history, openai_api_key, app_state, pathname
+    n_clicks, n_submit, user_input, chats, openai_api_key, app_state, pathname
 ):
-    if n_clicks == 0 and n_submit is None:
-        return "", None
+    callback_trigger = dash.callback_context.triggered[0]["prop_id"]
 
-    if user_input is None or user_input == "":
-        return chat_history, None
+    # Get data fetcher and chat history
+    if pathname not in chats:
+        chats[pathname] = []
+    chat_history = chats[pathname]
+    data_fetcher_fp = app_state[pathname]["data_dir"] + "/data_fetcher.pkl"
+    data_fetcher = data.Files.load(fp=data_fetcher_fp)
 
-    # Get data analyst response
-    data_dir = app_state[pathname]["data_dir"]
-    response = data_analyst(
-        user_input, openai_api_key=openai_api_key, data_dir=data_dir
-    )
-    # Add the input and the response to the chat history
-    chat_history.append(user_input)
-    chat_history.append(response)
+    # If the user has not entered any input, return dataset introduction
+    if n_clicks is None and n_submit is None and chat_history == []:
+        introduction = (
+            f"Ask questions about the following table: {data_fetcher.tables_info}"
+        )
+        response = dict(
+            action=dict(tool="Text", input=introduction), action_data=dict()
+        )
+        chat_history.append(response)
+    elif callback_trigger == "urlNoRefresh.pathname":
+        pass
+    else:
+        # If the user submitted an empty message return status quo
+        if user_input is None or user_input == "":
+            return chat_history, None
 
-    # Save the user input to the database
-    db.crud_question.create(db.Question(text=user_input))
+        # Get data analyst response
+        response = data_analyst(
+            user_input,
+            openai_api_key=openai_api_key,
+            data_fetcher=data_fetcher,
+        )
+        # Add the input and the response to the chat history
+        chat_history.append(user_input)
+        chat_history.append(response)
 
-    return chat_history, None
+        # Save the user input to the database
+        db.crud_question.create(db.Question(text=user_input))
+
+    chats[pathname] = chat_history
+    return chats, None
 
 
 def textbox(input, box="AI"):
@@ -171,7 +194,6 @@ def textbox(input, box="AI"):
             local_namespace = {"df": df}
             exec(compile(node, "<ast>", "exec"), local_namespace)
             fig = local_namespace.get("fig")
-
             return dcc.Graph(figure=fig, style=style)
         else:
             raise ValueError("Incorrect tool in `action`.")
@@ -181,10 +203,8 @@ def textbox(input, box="AI"):
 
 
 if __name__ == "__main__":
-    # from ada.tools import data
-
     # upload_dir = "/Users/josca/projects/ada/data/imdb"
-    # data_agent = data.Files(data_dir=upload_dir, llm=None)
-    # data_agent.save(upload_dir)
+    # data_agent = data.Files(data_dir=upload_dir)
+    # data_agent.save(upload_dir + "/data_fetcher.pkl")
 
     app.run_server(port=8050, debug=True)

@@ -4,7 +4,7 @@ import base64
 from dashboard.app import app
 import dash_bootstrap_components as dbc
 from ada.config import config
-from ada.tools import data
+from ada import data
 import uuid
 from pathlib import Path
 
@@ -143,7 +143,6 @@ def update_openai_api_key(openai_api_key):
         openai_key_hide = "................"
     else:
         openai_key_hide = ""
-        openai_api_key = "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"
     return openai_key_hide, openai_api_key
 
 
@@ -182,8 +181,8 @@ def save_uploaded_file_to_disk(content, filename, app_state):
             fp.write(base64.decodebytes(data_uploaded))
 
         # Create data agent and save
-        data_agent = data.Files(data_dir=upload_dir, llm=None)
-        data_agent.save(str(upload_dir))
+        data_fetcher = data.Files(data_dir=upload_dir, persist_data=True)
+        data_fetcher.save(str(upload_dir) + "/data_fetcher.pkl")
 
         # Update app state
         name = filename.split(".")[0]

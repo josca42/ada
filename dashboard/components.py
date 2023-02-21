@@ -107,19 +107,21 @@ def navigation():
     return html.Nav(
         [
             html.Div(
-                dbc.Button(
-                    "Upload data",
-                    color="primary",
-                    id="upload-data-button",
-                    size="md",
-                    outline=True,
-                ),
-                dbc.Popover(
-                    "You have to insert you openai api key again after uploading data. This is a bug that will be fixed in the future.",
-                    target="upload-data-button",
-                    body=True,
-                    trigger="hover",
-                ),
+                [
+                    dbc.Button(
+                        "Upload data",
+                        color="primary",
+                        id="upload-data-button",
+                        size="md",
+                        outline=True,
+                    ),
+                    dbc.Popover(
+                        "You have to insert you openai api key again after uploading data. This is a bug that will be fixed in the future.",
+                        target="upload-data-button",
+                        body=True,
+                        trigger="hover",
+                    ),
+                ],
                 className="navbar-nav me-auto",
             ),
             upload_data_modal(),

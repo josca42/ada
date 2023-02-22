@@ -28,7 +28,7 @@ app.layout = html.Div(
         html.Div(id="content"),
         dcc.Store(
             "openai-api-key",
-            data="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",
+            data="",
             storage_type="session",
         ),
         dcc.Store(
@@ -69,6 +69,12 @@ def layout(sidebar_context):
                 list="list-suggested-inputs",
             ),
             dbc.Button("Submit", id="submit", style={"background-color": "#218aff"}),
+            dbc.Popover(
+                "Remember to insert an openai api key in the top right corner",
+                target="submit",
+                body=True,
+                trigger="hover",
+            ),
         ]
     )
     chat_window = dbc.Container(
@@ -203,8 +209,7 @@ def textbox(input, box="AI"):
 
 
 if __name__ == "__main__":
-    # upload_dir = "/Users/josca/projects/ada/data/imdb"
+    # upload_dir = "/root/ada/data/imdb"
     # data_agent = data.Files(data_dir=upload_dir)
     # data_agent.save(upload_dir + "/data_fetcher.pkl")
-
     app.run_server(port=8050, debug=True)

@@ -1,4 +1,4 @@
-/data
+/data/uploaded_data
 /notebooks
 archive
 *-checkpoint.ipynb
